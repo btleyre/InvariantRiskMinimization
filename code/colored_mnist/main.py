@@ -25,6 +25,7 @@ parser.add_argument('--steps', type=int, default=501)
 parser.add_argument('--grayscale_model', action='store_true')
 parser.add_argument('--new_invar_penalty', action='store_true')
 parser.add_argument('--invar_penalty', action='store_true')
+parser.add_argument('--sigma', type=float, default=16.0)
 flags = parser.parse_args()
 
 print('Flags:')
@@ -80,7 +81,7 @@ for restart in range(flags.n_restarts):
     # need to implement some kind of batching.
     env_0_dataset = torch.utils.data.TensorDataset(
       envs[0]['images'],
-      envs[0]['labels'], torch.zeros(envs[0]['labels'].shape))
+      envs[0]['labels'], torch.zeros(envs[0]['labels'].shape).cuda())
 
     env_0_loader = torch.utils.data.DataLoader(
         env_0_dataset, batch_size=int(flags.b), shuffle=True
@@ -88,7 +89,7 @@ for restart in range(flags.n_restarts):
 
     env_1_dataset = torch.utils.data.TensorDataset(
       envs[1]['images'],
-      envs[1]['labels'], torch.ones(envs[1]['labels'].shape))
+      envs[1]['labels'], torch.ones(envs[1]['labels'].shape).cuda())
 
     env_1_loader = torch.utils.data.DataLoader(
         env_1_dataset, batch_size=int(flags.b), shuffle=True
@@ -108,14 +109,16 @@ for restart in range(flags.n_restarts):
             for lin in [lin1, lin2, lin3]:
                 nn.init.xavier_uniform_(lin.weight)
                 nn.init.zeros_(lin.bias)
-            self._main = nn.Sequential(lin1, nn.ReLU(True), lin2, nn.ReLU(True), lin3)
+            self._main = nn.Sequential(lin1, nn.ReLU(True), lin2, nn.ReLU(True))
+            self._classifier = lin3
         def forward(self, input):
             if flags.grayscale_model:
                 out = input.view(input.shape[0], 2, 14 * 14).sum(dim=1)
             else:
                 out = input.view(input.shape[0], 2 * 14 * 14)
-            out = self._main(out)
-            return out
+            rep = self._main(out)
+            out = self._classifier(rep)
+            return out, rep
 
     mlp = MLP().cuda()
 
@@ -161,76 +164,94 @@ for restart in range(flags.n_restarts):
             # examples from multiple environments.
             if flags.new_invar_penalty or flags.invar_penalty:
                 # Calculate nll for both envs here and avg them.
+                env_0_logits, env_0_reps = mlp(env_0_images)
+                env_0_nll = mean_nll(env_0_logits, env_0_labels)
+                env_0_acc = mean_accuracy(env_0_logits, env_0_labels)
+
+                env_1_logits, env_1_reps = mlp(env_1_images)
+                env_1_nll = mean_nll(env_1_logits, env_1_labels)
+                env_1_acc = mean_accuracy(env_1_logits, env_1_labels)
+
+                # Calculate averages, do backprop, etc.
+                train_nll = torch.stack([env_0_nll, env_1_nll]).mean()
+                train_acc = torch.stack([env_0_acc, env_1_acc]).mean()
+
+                # Group representations, labels, and labels
+                # for potential use with an invariance penalty.
+                all_reps = torch.cat([env_0_reps, env_1_reps])
+                all_labels= torch.cat([env_0_labels, env_1_labels])
+                all_envs = torch.cat([env_0_envs, env_1_envs])
 
 
                 penalty_val = None            
                 # Invariance penalties: these can be composed
                 if flags.new_invar_penalty:
-                    penalty_val = penalties.new_invariance_penalty(
-                        representation, batch_y, batch_envs, sigma
+                    penalty_val = -penalties.new_invariance_penalty(
+                        all_reps, all_labels, all_envs, flags.sigma
                         )
-                if flag.sinvar_penalty:
+                if flags.invar_penalty:
                     if penalty_val is None:
                         penalty_val = penalties.invariance_penalty(
-                            representation, batch_y, batch_envs, sigma
+                            all_reps, all_labels, all_envs, flags.sigma
                             )
                     else:
                         # Note that when we're composing this with the new
                         # penalty, we want it to be ADDED to the loss, so
                         # we'll subtract it from the current penalty.
-                        penalty_val -= penalties.invariance_penalty(
-                            representation, batch_y, batch_envs, sigma
-                            )  
+                        penalty_val += penalties.invariance_penalty(
+                            all_reps, all_labels, all_envs, flags.sigma
+                        )
+                train_penalty = penalty_val
 
             else:
                 # Calculate the per-environment loss, acc, penalty
-                env_0_logits = mlp(env_0_images)
+                env_0_logits, reps = mlp(env_0_images)
                 env_0_nll = mean_nll(env_0_logits, env_0_labels)
                 env_0_acc = mean_accuracy(env_0_logits, env_0_labels)
                 env_0_penalty = penalty(env_0_logits, env_0_labels)
 
-                env_1_logits = mlp(env_1_images)
+                env_1_logits, reps = mlp(env_1_images)
                 env_1_nll = mean_nll(env_1_logits, env_1_labels)
                 env_1_acc = mean_accuracy(env_1_logits, env_1_labels)
                 env_1_penalty = penalty(env_1_logits, env_1_labels)
-
-                # Also do some evaluation on the full test set.
-                test_logits = mlp(envs[2]['images'])
-                envs[2]['nll'] = mean_nll(test_logits, envs[2]['labels'])
-                envs[2]['acc'] = mean_accuracy(test_logits,envs[2]['labels'])
-                envs[2]['penalty'] = penalty(test_logits, envs[2]['labels'])
 
                 # Calculate averages, do backprop, etc.
                 train_nll = torch.stack([env_0_nll, env_1_nll]).mean()
                 train_acc = torch.stack([env_0_acc, env_1_acc]).mean()
                 train_penalty = torch.stack([env_0_penalty, env_1_penalty]).mean()
 
-                weight_norm = torch.tensor(0.).cuda()
-                for w in mlp.parameters():
-                    weight_norm += w.norm().pow(2)
+            # Also do some evaluation on the full test set.
+            test_logits, reps = mlp(envs[2]['images'])
+            envs[2]['nll'] = mean_nll(test_logits, envs[2]['labels'])
+            envs[2]['acc'] = mean_accuracy(test_logits,envs[2]['labels'])
+            envs[2]['penalty'] = penalty(test_logits, envs[2]['labels'])
 
-                loss = train_nll.clone()
-                loss += flags.l2_regularizer_weight * weight_norm
-                penalty_weight = (flags.penalty_weight
-                        if step >= flags.penalty_anneal_iters else 1.0)
-                loss += penalty_weight * train_penalty
-                if penalty_weight > 1.0:
-                    # Rescale the entire loss to keep gradients in a reasonable range
-                    loss /= penalty_weight
+            weight_norm = torch.tensor(0.).cuda()
+            for w in mlp.parameters():
+                weight_norm += w.norm().pow(2)
 
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                
-                test_acc = envs[2]['acc']
-                if step % 100 == 0:
-                    pretty_print(
-                        np.int32(step),
-                        train_nll.detach().cpu().numpy(),
-                        train_acc.detach().cpu().numpy(),
-                        train_penalty.detach().cpu().numpy(),
-                        test_acc.detach().cpu().numpy()
-                    )
+            loss = train_nll.clone()
+            loss += flags.l2_regularizer_weight * weight_norm
+            penalty_weight = (flags.penalty_weight
+                              if step >= flags.penalty_anneal_iters else 1.0)
+            loss += penalty_weight * train_penalty
+            if penalty_weight > 1.0:
+                # Rescale the entire loss to keep gradients in a reasonable range
+                loss /= penalty_weight
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            
+            test_acc = envs[2]['acc']
+            if step % 100 == 0:
+                pretty_print(
+                    np.int32(step),
+                    train_nll.detach().cpu().numpy(),
+                    train_acc.detach().cpu().numpy(),
+                    train_penalty.detach().cpu().numpy(),
+                    test_acc.detach().cpu().numpy()
+                )
 
     final_train_accs.append(train_acc.detach().cpu().numpy())
     final_test_accs.append(test_acc.detach().cpu().numpy())

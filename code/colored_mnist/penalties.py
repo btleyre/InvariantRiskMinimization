@@ -40,7 +40,7 @@ def kernel_matrix_gaussian(X, sigma=1, use_median=False):
         sigma = torch.median(pairwise_distances_x).detach()
 
     gamma = -1.0 / (sigma)
-    print("min pairwise dist:{}".format(torch.min(pairwise_distances_x)))
+    #print("min pairwise dist:{}".format(torch.min(pairwise_distances_x)))
     return torch.exp(gamma * pairwise_distances_x)
 
 
@@ -166,8 +166,8 @@ def invariance_penalty(representations, labels, env_labels, sigma=0.4):
     denominators += 1e-20
     # Add a small constant: NaNs are coming out around here
     # print("Denominators: {}".format(denominators))
-    print("Min kernel: {}".format(torch.min(kernel)))
-    print("Min denom: {}".format(torch.min(denominators)))
+    #print("Min kernel: {}".format(torch.min(kernel)))
+    #print("Min denom: {}".format(torch.min(denominators)))
     prob_distribution = matching_kernel_vals/denominators
 
     # print("Prob sum: {}".format(prob_distribution.sum()))
@@ -200,7 +200,7 @@ def invariance_penalty(representations, labels, env_labels, sigma=0.4):
     # print("Abs diff {}".format(abs_diff_expectations))
     # print("non matching kernel values {}".format(non_matching_kernel_vals))
 
-    return torch.sum(abs_diff_expectations*non_matching_kernel_vals)
+    return torch.sum(abs_diff_expectations*non_matching_kernel_vals)/(labels.shape[0]**2)
 
 
 def new_invariance_penalty(representations, labels, env_labels, sigma=0.4):
@@ -237,8 +237,8 @@ def new_invariance_penalty(representations, labels, env_labels, sigma=0.4):
     denominators += 1e-20
     # Add a small constant: NaNs are coming out around here
     # print("Denominators: {}".format(denominators))
-    print("Min kernel: {}".format(torch.min(kernel)))
-    print("Min denom: {}".format(torch.min(denominators)))
+    #print("Min kernel: {}".format(torch.min(kernel)))
+    #print("Min denom: {}".format(torch.min(denominators)))
     prob_distribution = matching_kernel_vals/denominators
 
     # print("Prob sum: {}".format(prob_distribution.sum()))
@@ -275,7 +275,7 @@ def new_invariance_penalty(representations, labels, env_labels, sigma=0.4):
     # print("non matching kernel values {}".format(non_matching_kernel_vals))
 
     #return torch.sum(abs_diff_expectations*non_matching_kernel_vals)
-    return torch.sum(new_terms*non_matching_kernel_vals)
+    return torch.sum(new_terms*non_matching_kernel_vals)/(labels.shape[0]**2)
 
 
 def representation_analysis(representations, labels, sigma=0.4):
