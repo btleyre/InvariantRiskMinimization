@@ -35,8 +35,8 @@ python3 -u ./code/colored_mnist/main.py \
   --steps=501 \
   --n_restarts 1\
   -b=5000 \
-  --sigma=0.01 \
-  --exper_name=erm
+  --sigma=0.1 \
+  --exper_name=sig_1_erm
 
 # ERM with a model that's invariant by construction. These hyperparams were
 # chosen by random search with 50 trials and the following ranges. We picked the
@@ -58,8 +58,8 @@ python3 -u ./code/colored_mnist/main.py \
   --steps=101 \
   --n_restarts 1 \
   -b=5000 \
-  --sigma=0.01 \
-  --exper_name=erm_grayscale
+  --sigma=0.1 \
+  --exper_name=sig_1_erm_grayscale
 
 # hidden_dim = int(2**np.random.uniform(6, 9))
 # l2_regularizer_weight = 10**np.random.uniform(-2, -5)
@@ -76,5 +76,5 @@ python3 -u ./code/colored_mnist/main.py \
   --steps=501 \
   --n_restarts 1 \
   -b=5000 \
-  --sigma=0.01 \
-  --exper_name=irm
+  --sigma=0.1 \
+  --exper_name=sig_1_irm

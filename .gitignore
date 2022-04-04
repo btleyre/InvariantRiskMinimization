@@ -3,3 +3,5 @@ __pycache__
 
 # Don't include the output from our slurm jobs.
 *.out
+*.png
+old_code
