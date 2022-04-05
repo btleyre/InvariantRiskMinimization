@@ -6,7 +6,10 @@
 #
 
 import argparse
+import random
+from joblib import PrintTime
 import numpy as np
+import pandas as pd
 import torch
 from torchvision import datasets
 from torch import nn, optim, autograd
@@ -150,6 +153,13 @@ parser.add_argument('--new_invar_penalty', action='store_true')
 parser.add_argument('--invar_penalty', action='store_true')
 parser.add_argument('--sigma', type=float, default=16.0)
 parser.add_argument('--exper_name', type=str, default="default_names")
+parser.add_argument('--use_reg', action='store_true')
+
+seed = 1234
+torch.manual_seed(seed)
+np.random.seed(seed)
+random.seed(seed)
+
 flags = parser.parse_args()
 
 print('Flags:')
@@ -239,12 +249,16 @@ for restart in range(flags.n_restarts):
                 nn.init.zeros_(lin.bias)
             self._main = nn.Sequential(lin1, nn.ReLU(True), lin2, nn.ReLU(True))
             self._classifier = lin3
+            self._regularize = flags.use_reg
         def forward(self, input):
             if flags.grayscale_model:
                 out = input.view(input.shape[0], 2, 14 * 14).sum(dim=1)
             else:
                 out = input.view(input.shape[0], 2 * 14 * 14)
             rep = self._main(out)
+            # If asked to, regularize to the h y p e r s p h e r e
+            if self._regularize:
+                rep = torch.nn.functional.normalize(rep)
             out = self._classifier(rep)
             return out, rep
 
@@ -389,7 +403,7 @@ for restart in range(flags.n_restarts):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            
+
             test_acc = envs[2]['acc']
             if step % 100 == 0:
                 # Do some representational analysis every 100 epochs
@@ -446,3 +460,11 @@ for restart in range(flags.n_restarts):
     print(np.mean(final_train_accs), np.std(final_train_accs))
     print('Final test acc (mean/std across restarts so far):')
     print(np.mean(final_test_accs), np.std(final_test_accs))
+
+# Save the train and test accuracy.
+stats_dict = {
+        'test_acc': np.mean(final_test_accs),
+        'train_acc': np.mean(final_train_accs),
+    }
+stats_dict.update(vars(flags))
+df = pd.DataFrame(stats_dict, index=[0]).to_csv("{}_stats.csv".format(flags.exper_name))

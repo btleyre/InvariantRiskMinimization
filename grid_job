@@ -1,0 +1,22 @@
+#!/bin/bash
+#SBATCH -N 1
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=1
+#SBATCH --time=60:00:00
+#SBATCH --mem=16GB
+#SBATCH --job-name=test
+
+# Train the model
+
+time python3 -u ./code/colored_mnist/main.py \
+  --hidden_dim=$1 \
+  --l2_regularizer_weight=$2 \
+  --lr=$3 \
+  --penalty_anneal_iters=0 \
+  --penalty_weight=$4 \
+  --steps=501 \
+  -b=5000 \
+  --n_restarts 1 \
+  --sigma=$5 \
+  --exper_name=$6 \
+  $7 $8 $9 ${10} ${11}

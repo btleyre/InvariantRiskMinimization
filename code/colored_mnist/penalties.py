@@ -478,6 +478,7 @@ def intra_env_analysis(legend_dict, prob_distribution, expected_labels,
 
         metric_dicts_dict[sample_name] = metrics_dict
         
+        """
         if not use_label:
             print(group_names)
             print(group_means)
@@ -493,6 +494,7 @@ def intra_env_analysis(legend_dict, prob_distribution, expected_labels,
             # Save the figure and show
             plt.tight_layout()
             plt.savefig('./{}_{}_intra_env.png'.format(exper_name, sample_name))
+        """
 
     return metric_dicts_dict
 
@@ -592,6 +594,7 @@ def between_env_analysis(legend_dict, kernel, expected_labels, labels, env_label
         metrics_dict['sample_expected_labels_mean'] = torch.mean(sample_expected_labels).detach().item()
         metric_dicts_dict[sample_name] = metrics_dict
 
+        """
         if not use_label:
             print(group_names)
             fig, ax = plt.subplots()
@@ -614,6 +617,7 @@ def between_env_analysis(legend_dict, kernel, expected_labels, labels, env_label
             # Save the figure and show
             plt.tight_layout()
             plt.savefig('./{}_{}_between_env.png'.format(exper_name, sample_name))
+        """
 
     return metric_dicts_dict
 
@@ -640,7 +644,8 @@ def plot_within_env(group_names,
 
         # Save the figure and show
         plt.tight_layout()
-        plt.savefig('./{}_{}_intra_env.png'.format(exper_name, sample_name))
+        plt.savefig('{}_{}_intra_env.png'.format(exper_name, sample_name))
+        plt.clf()
 
 
 def plot_between_env(group_names,
@@ -677,4 +682,5 @@ def plot_between_env(group_names,
 
         # Save the figure and show
         plt.tight_layout()
-        plt.savefig('./{}_{}_between_env.png'.format(exper_name, sample_name))
+        plt.savefig('{}_{}_between_env.png'.format(exper_name, sample_name))
+        plt.clf()
