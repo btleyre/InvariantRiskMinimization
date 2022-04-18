@@ -1,5 +1,4 @@
 """Gridsearch for nli experiments"""
-import argparse
 import os
 
 import subprocess
@@ -17,18 +16,18 @@ def main():
                         job_name = "{}_hid_{}_lr_{}_l2_{}_pen_{}_sigma".format(
                             hid_dim,
                             lr,
-                            lr,
+                            l2,
                             penalty_weight,
                             sigma
                         )
 
                         # Create a directory to house the artifacts.
-                        os.mkdir('./grid_output/grid_invar_{}'.format(job_name))
+                        os.mkdir('./grid_output/sphere_grid_invar_{}'.format(job_name))
 
                         cmd = [
                             'sbatch',
                             '--partition=gpu',
-                            '--output=./grid_output/invar_{}_%j.out'.format(job_name),
+                            '--output=./grid_output/sphere_invar_{}_%j.out'.format(job_name),
                             '--job-name={}'.format(job_name),
                             'grid_job',
                             str(hid_dim),
@@ -36,19 +35,20 @@ def main():
                             str(lr),
                             str(penalty_weight),
                             str(sigma),
-                            './grid_output/grid_invar_{}/'.format(job_name),
-                            '--invar_penalty'
+                            './grid_output/sphere_grid_invar_{}/'.format(job_name),
+                            '--invar_penalty',
+                            '--use_reg'
 
                         ]
                         subprocess.run(cmd)
 
                         # Create a directory to house the artifacts.
-                        os.mkdir('./grid_output/grid_new_invar_{}'.format(job_name))
+                        os.mkdir('./grid_output/sphere_grid_new_invar_{}'.format(job_name))
 
                         cmd = [
                             'sbatch',
                             '--partition=gpu',
-                            '--output=./grid_output/new_{}_%j.out'.format(job_name),
+                            '--output=./grid_output/sphere_new_{}_%j.out'.format(job_name),
                             '--job-name={}'.format(job_name),
                             'grid_job',
                             str(hid_dim),
@@ -56,18 +56,19 @@ def main():
                             str(lr),
                             str(penalty_weight),
                             str(sigma),
-                            './grid_output/grid_new_invar_{}/'.format(job_name),
+                            './grid_output/sphere_grid_new_invar_{}/'.format(job_name),
                             '--new_invar_penalty',
+                            '--use_reg'
                         ]
                         subprocess.run(cmd)
 
                         # Create a directory to house the artifacts.
-                        os.mkdir('./grid_output/grid_both_{}'.format(job_name))
+                        os.mkdir('./grid_output/sphere_grid_both_{}'.format(job_name))
 
                         cmd = [
                             'sbatch',
                             '--partition=gpu',
-                            '--output=./grid_output/both_{}_%j.out'.format(job_name),
+                            '--output=./grid_output/sphere_both_{}_%j.out'.format(job_name),
                             '--job-name={}'.format(job_name),
                             'grid_job',
                             str(hid_dim),
@@ -75,12 +76,12 @@ def main():
                             str(lr),
                             str(penalty_weight),
                             str(sigma),
-                            './grid_output/grid_both_{}/'.format(job_name),
+                            './grid_output/sphere_grid_both_{}/'.format(job_name),
                             '--new_invar_penalty',
-                            '--invar_penalty'
+                            '--invar_penalty',
+                            '--use_reg'
                         ]
                         subprocess.run(cmd)
-                        1/0
 
 
 if __name__ == "__main__":
